@@ -291,6 +291,16 @@ class QueueChannel:
 				notnull=True,
 				default=False
 			),
+                        Variables.TextChanVar(
+                                "split_channel_id",
+                                display="Split results channel",
+                                section="Leaderboard"                                
+                        ),
+                        Variables.TextChanVar(
+                                "season_channel_id",
+                                display="Season leaderboard channel",
+                                section="Leaderboard"
+                        ),
 			VariableTable(
 				'ranks', display="Rating ranks", section="Leaderboard",
 				variables=[

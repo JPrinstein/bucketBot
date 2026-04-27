@@ -674,10 +674,15 @@ async def _commands(
 		interaction: Interaction,
 ): await interaction.response.send_message(cfg.COMMANDS_URL, ephemeral=True)
 
+# split -> ...
+@groups.admin_split.subcommand(name='end', description='End the current split, post results, and reset ratings.')
+async def _split_end(
+    interaction: Interaction,
+    split_number: int = SlashOption(required=True, description="Split number e.g. 1, 2, 3")
+): await run_slash(bot.commands.split_end, interaction=interaction, split_number=split_number)
 
-@dc.slash_command(name='nick', description='Change your nickname with the rating prefix.', **guild_kwargs)
-async def _nick(
-		interaction: Interaction,
-		nick: str
-): await run_slash(bot.commands.set_nick, interaction=interaction, nick=nick)
-
+@groups.admin_split.subcommand(name='season_reset', description='Reset all season points.')
+async def _season_reset(
+    interaction: Interaction,
+    season_number: int = SlashOption(required=True, description="Season number e.g. 1, 2, 3")
+): await run_slash(bot.commands.season_reset, interaction=interaction, season_number=season_number)
