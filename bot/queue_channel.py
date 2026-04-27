@@ -301,6 +301,12 @@ class QueueChannel:
                                 display="Season leaderboard channel",
                                 section="Leaderboard"
                         ),
+			Variables.IntVar(
+                                "boost_match_threshold",
+                                display="Daily boost match threshold",
+                                section="Leaderboard",
+                                description="Matches needed in a day to earn 2x win points next day. Default: 5"
+                        ),
 			VariableTable(
 				'ranks', display="Rating ranks", section="Leaderboard",
 				variables=[

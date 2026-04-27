@@ -283,3 +283,10 @@ async def _rating_unhide(ctx: MessageContext, args: str = None):
 		raise bot.Exc.SyntaxError(f"Usage: {ctx.qc.cfg.prefix}rating_unhide_player __@player__")
 
 	await bot.commands.rating_hide(ctx, player=args, hide=False)
+
+@message_command('end_day')
+async def _end_day(ctx: MessageContext, args: str = None):
+	if not ctx.channel.permissions_for(ctx.author).administrator:
+		await ctx.channel.send(embed=error_embed("Admins only."))
+		return
+	await bot.daily_boost.run_daily_reset(manual=True,use_today=True)

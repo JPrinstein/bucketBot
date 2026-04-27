@@ -192,6 +192,15 @@ async def register_match_ranked(ctx, m):
 	after = iter_to_dict((*results[-1][0], *results[-1][1]), key='user_id')
 	before = iter_to_dict((*results[0][0], *results[0][1]), key='user_id')
 
+	# Apply 2x win boost before DB write
+	if m.winner is not None:
+		winners = m.teams[m.winner]
+		for p in winners:
+			if await bot.daily_boost.player_has_boost(m.qc.id, p.id):
+				gain = after[p.id]['rating'] - before[p.id]['rating']
+				if gain > 0:
+					after[p.id]['rating'] += gain
+
 	for p in m.players:
 		nick = get_nick(p)
 		team = 0 if p in m.teams[0] else 1
@@ -226,6 +235,9 @@ async def register_match_ranked(ctx, m):
 			match_id=m.id,
 			reason=m.queue.name
 		))
+
+	for p in m.players:
+                await bot.daily_boost.increment_match_count(m.qc.id, p.id)
 
 	await m.qc.update_rating_roles(*m.players)
 	await m.print_rating_results(ctx, before, after)
