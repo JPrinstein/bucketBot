@@ -1,4 +1,4 @@
-__all__ = ['auto_ready', 'expire', 'default_expire', 'allow_offline', 'switch_dms', 'cointoss', 'show_help', 'set_nick']
+__all__ = ['auto_ready', 'expire', 'default_expire', 'allow_offline', 'switch_dms', 'cointoss', 'show_help']
 
 from time import time
 from datetime import timedelta
@@ -140,17 +140,3 @@ async def show_help(ctx, queue: str = None):
 		raise bot.Exc.SyntaxError(f"Queue '{queue}' not found on the channel.")
 
 	await ctx.reply_dm(q.cfg.description or ctx.qc.gt('Specified queue has no help answer set.'))
-
-
-async def set_nick(ctx, nick: str):
-	data = await db.select_one(
-		['rating'], 'qc_players',
-		where={'channel_id': ctx.author.id, 'user_id': ctx.author.id}
-	)
-	if not data or data['rating'] is None:
-		rating = ctx.qc.rating.init_rp
-	else:
-		rating = data['rating']
-
-	await ctx.author.edit(nick=f"[{rating}] " + nick)
-	await ctx.ignore(ctx.qc.gt("Done."))
