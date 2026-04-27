@@ -176,12 +176,16 @@ async def leaderboard(ctx, page: int = 1):
 	if not len(data):
 		raise bot.Exc.NotFoundError(ctx.qc.gt("Leaderboard is empty."))
 
+	def resolve_nick(row):
+		member = ctx.channel.guild.get_member(row['user_id'])
+		return get_nick(member) if member else row['nick'].strip()
+    
 	if ctx.qc.cfg.emoji_ranks:  # display as embed message
 		embed = Embed(title=f"Leaderboard - page {page+1} of {pages}", colour=Colour(0x7289DA))
 		embed.add_field(
 			name="Nickname",
 			value="\n".join((
-				f'**{(page*10)+n+1}** ' + data[n]['nick'].strip()[:14]
+				f'**{(page*10)+n+1}** ' + resolve_nick(data[n])[:14]
 				for n in range(len(data))
 			)),
 			inline=True
@@ -213,7 +217,7 @@ async def leaderboard(ctx, page: int = 1):
 			[[
 				(page * 10) + (n + 1),
 				str(data[n]['rating']) + ctx.qc.rating_rank(data[n]['rating'])['rank'],
-				data[n]['nick'].strip(),
+				resolve_nick(data[n]),
 				int(data[n]['wins'] + data[n]['losses'] + data[n]['draws']),
 				"{0}/{1}/{2} ({3}%)".format(
 					data[n]['wins'],
