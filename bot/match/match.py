@@ -343,7 +343,8 @@ class Match:
 		self.scores = scores
 		await self.finish_match(ctx)
 
-	async def print_rating_results(self, ctx, before, after):
+	async def print_rating_results(self, ctx, before, after,boost_winners=None):
+		boost_winners = boost_winners or set()
 		msg = "```markdown\n"
 		msg += f"{self.queue.name.capitalize()}({self.id}) results\n"
 		msg += "-------------"
@@ -355,7 +356,8 @@ class Match:
 
 		if len(winners) == 1 and len(losers) == 1:
 			p = winners[0]
-			msg += f"\n1. {get_nick(p)} {before[p.id]['rating']} ⟼ {after[p.id]['rating']}"
+			boost_tag = " 2x" if p.id in boost_winners else ""
+			msg += f"\n1. {get_nick(p)} {before[p.id]['rating']} ⟼ {after[p.id]['rating']}{boost_tag}"
 			p = losers[0]
 			msg += f"\n2. {get_nick(p)} {before[p.id]['rating']} ⟼ {after[p.id]['rating']}"
 		else:
@@ -365,7 +367,7 @@ class Match:
 				avg_af = int(sum((after[p.id]['rating'] for p in team))/len(team))
 				msg += f"\n{n}. {team.name} {avg_bf} ⟼ {avg_af}\n"
 				msg += "\n".join(
-					(f"> {get_nick(p)} {before[p.id]['rating']} ⟼ {after[p.id]['rating']}" for p in team)
+					(f"> {get_nick(p)} {before[p.id]['rating']} ⟼ {after[p.id]['rating']}{' 2x' if p.id in boost_winners else ''}" for p in team)
 				)
 				n += 1
 		msg += "```"

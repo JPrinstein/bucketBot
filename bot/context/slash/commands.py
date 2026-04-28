@@ -685,4 +685,10 @@ async def _split_end(
 async def _season_reset(
     interaction: Interaction,
     season_number: int = SlashOption(required=True, description="Season number e.g. 1, 2, 3")
-): await run_slash(bot.commands.season_reset, interaction=interaction, season_number=season_number)
+): await run_slash(bot.commands.season_reset, interaction=interaction, season_number=season)
+
+@dc.slash_command(name='matches_played', description='Show matches played today.', **guild_kwargs)
+async def _matches_played(
+	interaction: Interaction,
+	player: Member = SlashOption(required=False, verify=False),
+): await run_slash(bot.commands.matches_played, interaction=interaction, player=player)

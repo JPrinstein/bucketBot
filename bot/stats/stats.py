@@ -101,9 +101,6 @@ db.ensure_table(dict(
 
 
 async def check_match_id_counter():
-	"""
-	Set to current max match_id+1 if not persist or less
-	"""
 	m = await db.select_one(('match_id',), 'qc_matches', order_by='match_id', limit=1)
 	next_known_match = m['match_id']+1 if m else 0
 	counter = await db.select_one(('next_id',), 'qc_match_id_counter')
@@ -114,7 +111,6 @@ async def check_match_id_counter():
 
 
 async def next_match():
-	""" Increase match_id counter, return current match_id """
 	counter = await db.select_one(('next_id',), 'qc_match_id_counter')
 	await db.update('qc_match_id_counter', dict(next_id=counter['next_id']+1))
 	log.debug(f"Current match_id is {counter['next_id']}")
@@ -140,14 +136,12 @@ async def register_match_unranked(ctx, m):
 			dict(nick=nick),
 			keys=dict(channel_id=m.qc.id, user_id=p.id)
 		)
-
 		if p in m.teams[0]:
 			team = 0
 		elif p in m.teams[1]:
 			team = 1
 		else:
 			team = None
-
 		await db.insert(
 			'qc_player_matches',
 			dict(match_id=m.id, channel_id=m.qc.id, user_id=p.id, nick=nick, team=team)
@@ -192,14 +186,19 @@ async def register_match_ranked(ctx, m):
 	after = iter_to_dict((*results[-1][0], *results[-1][1]), key='user_id')
 	before = iter_to_dict((*results[0][0], *results[0][1]), key='user_id')
 
-	# Apply 2x win boost before DB write
-	if m.winner is not None:
-		winners = m.teams[m.winner]
-		for p in winners:
-			if await bot.daily_boost.player_has_boost(m.qc.id, p.id):
-				gain = after[p.id]['rating'] - before[p.id]['rating']
-				if gain > 0:
-					after[p.id]['rating'] += gain
+	# Apply 2x win boost before DB write (winners only, losers unaffected)
+	
+	# Apply 2x win boost before DB write (winners only, losers unaffected)
+	boost_winners = set()
+	if m.winner is not None and getattr(m.qc.cfg, 'boost_enabled', False):
+		winner_ids = {p.id for p in m.teams[m.winner]}
+		for uid, data in after.items():
+			if uid in winner_ids:
+				if await bot.daily_boost.player_has_boost(m.qc.id, uid):
+					gain = data['rating'] - before[uid]['rating']
+					if gain > 0:
+						after[uid]['rating'] += gain
+						boost_winners.add(uid)
 
 	for p in m.players:
 		nick = get_nick(p)
@@ -224,23 +223,51 @@ async def register_match_ranked(ctx, m):
 			'qc_player_matches',
 			dict(match_id=m.id, channel_id=m.qc.id, user_id=p.id, nick=nick, team=team)
 		)
-		await db.insert('qc_rating_history', dict(
-			channel_id=m.qc.rating.channel_id,
-			user_id=p.id,
-			at=now,
-			rating_before=before[p.id]['rating'],
-			rating_change=after[p.id]['rating']-before[p.id]['rating'],
-			deviation_before=before[p.id]['deviation'],
-			deviation_change=after[p.id]['deviation']-before[p.id]['deviation'],
-			match_id=m.id,
-			reason=m.queue.name
-		))
+
+		# For boosted winners, split into two history entries: base gain + bonus gain
+		if p.id in boost_winners:
+			base_gain = (after[p.id]['rating'] - before[p.id]['rating']) // 2
+			bonus_gain = after[p.id]['rating'] - before[p.id]['rating'] - base_gain
+			await db.insert('qc_rating_history', dict(
+				channel_id=m.qc.rating.channel_id,
+				user_id=p.id,
+				at=now,
+				rating_before=before[p.id]['rating'],
+				rating_change=base_gain,
+				deviation_before=before[p.id]['deviation'],
+				deviation_change=after[p.id]['deviation']-before[p.id]['deviation'],
+				match_id=m.id,
+				reason=m.queue.name
+			))
+			await db.insert('qc_rating_history', dict(
+				channel_id=m.qc.rating.channel_id,
+				user_id=p.id,
+				at=now,
+				rating_before=before[p.id]['rating'] + base_gain,
+				rating_change=bonus_gain,
+				deviation_before=after[p.id]['deviation'],
+				deviation_change=0,
+				match_id=m.id,
+				reason=f"{m.queue.name} (2x boost)"
+			))
+		else:
+			await db.insert('qc_rating_history', dict(
+				channel_id=m.qc.rating.channel_id,
+				user_id=p.id,
+				at=now,
+				rating_before=before[p.id]['rating'],
+				rating_change=after[p.id]['rating']-before[p.id]['rating'],
+				deviation_before=before[p.id]['deviation'],
+				deviation_change=after[p.id]['deviation']-before[p.id]['deviation'],
+				match_id=m.id,
+				reason=m.queue.name
+			))
 
 	for p in m.players:
-                await bot.daily_boost.increment_match_count(m.qc.id, p.id)
+		await bot.daily_boost.increment_match_count(m.qc.id, p.id)
 
 	await m.qc.update_rating_roles(*m.players)
-	await m.print_rating_results(ctx, before, after)
+	await m.print_rating_results(ctx, before, after, boost_winners)
 
 
 async def undo_match(ctx, match_id):
@@ -352,7 +379,6 @@ async def top(channel_id, time_gap=None):
 
 
 async def last_games(channel_id):
-	#  get last played ranked match for all players
 	data = await db.fetchall(
 		"SELECT tmp.at, p.* " +
 		"FROM `qc_players` AS p " +
@@ -376,7 +402,7 @@ class StatsJobs:
 	def next_monday():
 		d = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 		d += datetime.timedelta(days=1)
-		while d.weekday() != 0:  # 0 for monday
+		while d.weekday() != 0:
 			d += datetime.timedelta(days=1)
 		return d
 

@@ -96,6 +96,12 @@ class QueueChannel:
 				default=1,
 				notnull=True
 			),
+			Variables.BoolVar(
+                                "boost_enabled",
+                                display="Daily win boost enabled",
+                                section="Leaderboard",
+                                description="Enable the daily 2x win boost system. Default: off"
+                        ),
 			Variables.DurationVar(
 				"expire_time",
 				display="Auto remove on timer after last !add command",

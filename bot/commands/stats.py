@@ -1,4 +1,4 @@
-__all__ = ['last_game', 'stats', 'top', 'rank', 'leaderboard']
+__all__ = ['last_game', 'stats', 'top', 'rank', 'leaderboard', 'matches_played']
 
 from time import time
 from math import ceil
@@ -113,7 +113,6 @@ async def rank(ctx, player: Member = None):
 		raise bot.Exc.SyntaxError(ctx.qc.gt("Specified user not found."))
 
 	data = await ctx.qc.get_lb()
-	# Figure out leaderboard placement
 	if p := find(lambda i: i['user_id'] == target.id, data):
 		place = data.index(p) + 1
 	else:
@@ -133,7 +132,7 @@ async def rank(ctx, player: Member = None):
 			embed.add_field(name=ctx.qc.gt("Rank"), value=f"**{ctx.qc.rating_rank(p['rating'])['rank']}**", inline=True)
 			embed.add_field(name=ctx.qc.gt("Rating"), value=f"**{p['rating']}**±{p['deviation']}")
 		else:
-			embed.add_field(name=ctx.qc.gt("Rank"), value="**〈?〉**", inline=True)
+			embed.add_field(name=ctx.qc.gt("Rank"), value="**〈?〉**", inline=True)
 			embed.add_field(name=ctx.qc.gt("Rating"), value="**?**")
 		embed.add_field(
 			name="W/L/D/S",
@@ -179,7 +178,7 @@ async def leaderboard(ctx, page: int = 1):
 	def resolve_nick(row):
 		member = ctx.channel.guild.get_member(row['user_id'])
 		return get_nick(member) if member else row['nick'].strip()
-    
+
 	if ctx.qc.cfg.emoji_ranks:  # display as embed message
 		embed = Embed(title=f"Leaderboard - page {page+1} of {pages}", colour=Colour(0x7289DA))
 		embed.add_field(
@@ -213,7 +212,7 @@ async def leaderboard(ctx, page: int = 1):
 	# display as md table
 	await ctx.reply(
 		discord_table(
-			["№", "Rating〈Ξ〉", "Nickname", "Matches", "W/L/D"],
+			["№", "Rating〈Ξ〉", "Nickname", "Matches", "W/L/D"],
 			[[
 				(page * 10) + (n + 1),
 				str(data[n]['rating']) + ctx.qc.rating_rank(data[n]['rating'])['rank'],
@@ -228,3 +227,50 @@ async def leaderboard(ctx, page: int = 1):
 			] for n in range(len(data))]
 		)
 	)
+
+
+async def matches_played(ctx, player: Member = None):
+	today = bot.daily_boost.get_et_today()
+	threshold = getattr(ctx.qc.cfg, 'boost_match_threshold', None) or 5
+
+	if player:
+		target = await ctx.get_member(player)
+		if not target:
+			raise bot.Exc.NotFoundError(ctx.qc.gt("Specified user not found."))
+		row = await db.select_one(
+			('count',), 'qc_daily_match_counts',
+			where=dict(channel_id=ctx.qc.id, user_id=target.id, et_date=today)
+		)
+		count = row['count'] if row else 0
+		has_boost = await bot.daily_boost.player_has_boost(ctx.qc.id, target.id)
+		tomorrow_boost = "2x" if count >= threshold else "1x"
+		today_boost = "2x Active" if has_boost else "1x"
+		embed = Embed(
+			title=f"Matches Today - {get_nick(target)}",
+			colour=Colour(0x50e3c2)
+		)
+		embed.add_field(
+			name="Status",
+			value=f"Matches today: **{count}** / **{threshold}**\nToday's boost: **{today_boost}**\nTomorrow's boost: **{tomorrow_boost}**",
+			inline=False
+		)
+		await ctx.reply(embed=embed)
+	else:
+		rows = await db.select(
+			['user_id', 'count'], 'qc_daily_match_counts',
+			where=dict(channel_id=ctx.qc.id, et_date=today)
+		)
+		if not rows:
+			raise bot.Exc.NotFoundError("No matches played today yet.")
+		rows.sort(key=lambda r: r['count'], reverse=True)
+		embed = Embed(title="Matches Played Today", colour=Colour(0x50e3c2))
+		lines = []
+		for r in rows:
+			nick = await bot.daily_boost._get_nick(ctx.qc.id, r['user_id'])
+			has_boost = await bot.daily_boost.player_has_boost(ctx.qc.id, r['user_id'])
+			count_str = f"**{r['count']}**{'✅' if r['count'] >= threshold else ''}"
+			boost_str = "2x" if has_boost else "1x"
+			lines.append(f"**{nick}** — {count_str} matches | {boost_str}")
+		embed.add_field(name="Players", value="\n".join(lines), inline=False)
+		embed.set_footer(text=f"✅ = will earn 2x boost tomorrow (threshold: {threshold})")
+		await ctx.reply(embed=embed)

@@ -89,6 +89,9 @@ async def run_daily_reset(manual=False, use_today=False):
 
 	for channel_id, qc in list(bot.queue_channels.items()):
 		threshold = getattr(qc.cfg, 'boost_match_threshold', None) or DEFAULT_THRESHOLD
+		
+		if not getattr(qc.cfg, 'boost_enabled', False):
+			continue
 
 		yesterday_counts = await db.select(
 			['user_id', 'count'], 'qc_daily_match_counts',
@@ -149,8 +152,8 @@ async def run_daily_reset(manual=False, use_today=False):
 				if manual:
 					title += " *(manual)*"
 				embed = Embed(title=title, colour=Colour(0xF4A460))
-				embed.add_field(name="Player", value="\n".join(lines_nicknames), inline=True)
-				embed.add_field(name="Boost", value="\n".join(lines_status), inline=True)
+				combined = "\n".join(f"**{n}**: {s}" for n, s in zip(lines_nicknames, lines_status))
+				embed.add_field(name="Boost Updates", value=combined, inline=False)
 				await channel.send(embed=embed)
 		except Exception as e:
 			log.error(f"daily_boost: failed to post to channel {channel_id}: {e}")
