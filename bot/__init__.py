@@ -33,3 +33,4 @@ def background_context(coro):
 		await coro(SystemContext(qc=qc), *args, **kwargs)
 	return wrapper
 from . import daily_boost
+from .api import init as api_init; api_init()
