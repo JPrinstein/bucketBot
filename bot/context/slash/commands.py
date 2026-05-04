@@ -692,3 +692,21 @@ async def _matches_played(
 	interaction: Interaction,
 	player: Member = SlashOption(required=False, verify=False),
 ): await run_slash(bot.commands.matches_played, interaction=interaction, player=player)
+
+
+@groups.admin_split.subcommand(name='archive_add', description='Manually add/edit a player points in a past season archive.')
+async def _season_archive_add(
+	interaction: Interaction,
+	season_number: int = SlashOption(description="Season number e.g. 17"),
+	player: str = SlashOption(description="Player nickname or name"),
+	points: int = SlashOption(description="Points to set")
+): await run_slash(bot.commands.season_archive_add, interaction=interaction, season_number=season_number, player=player, points=points)
+ 
+@groups.admin_split.subcommand(name='set_winner', description='Set the 3 tournament winners for a season.')
+async def _season_set_winner(
+	interaction: Interaction,
+	season_number: int = SlashOption(description="Season number e.g. 17"),
+	player1: str = SlashOption(description="1st winner"),
+	player2: str = SlashOption(description="2nd winner"),
+	player3: str = SlashOption(description="3rd winner")
+): await run_slash(bot.commands.season_set_winner, interaction=interaction, season_number=season_number, player1=player1, player2=player2, player3=player3)
